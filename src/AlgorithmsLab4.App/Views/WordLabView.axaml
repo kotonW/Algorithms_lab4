@@ -1,0 +1,217 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:AlgorithmsLab4.App.ViewModels"
+             x:Class="AlgorithmsLab4.App.Views.WordLabView"
+             x:DataType="vm:WordLabViewModel">
+
+  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="24,20,24,28" Spacing="16">
+
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+        <StackPanel Spacing="5">
+          <TextBlock Classes="section" Text="ЗАДАНИЕ 3 · СОРТИРОВКА СЛОВ" />
+          <TextBlock Classes="page-title" Text="QuickSort и radix sort на текстах" />
+          <TextBlock Classes="muted" MaxWidth="1000"
+                     Text="Текст разбивается на отдельные слова и сортируется лексикографически двумя алгоритмами: быстрой сортировкой и поразрядной (radix) сортировкой. После сортировки программа проходит по массиву и считает, сколько раз встречается каждое слово. Затем проводятся замеры времени на текстах длиной 100, 500, 1000, 2000, 5000 и 10 000 слов." />
+        </StackPanel>
+
+        <Border Grid.Column="1" Classes="panel" Padding="14" Width="320" VerticalAlignment="Top">
+          <StackPanel Spacing="9">
+            <TextBlock Classes="section" Text="ДВА АЛГОРИТМА" />
+            <Border Classes="chip"><TextBlock Text="QuickSort · сравнения" Classes="mono" /></Border>
+            <Border Classes="chip"><TextBlock Text="Radix sort · разряды" Classes="mono" /></Border>
+            <TextBlock Classes="muted"
+                       Text="Одинаковые слова после сортировки стоят рядом — поэтому частоты считаются за один проход." />
+          </StackPanel>
+        </Border>
+      </Grid>
+
+      <Border Classes="panel" Padding="16">
+        <StackPanel Spacing="10">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <StackPanel Spacing="5">
+              <TextBlock Classes="section" Text="ТЕКСТ" Margin="0" />
+              <TextBox Text="{Binding InputText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                       AcceptsReturn="True"
+                       TextWrapping="Wrap"
+                       Height="150"
+                       PlaceholderText="Вставьте английский или русский текст…"
+                       ScrollViewer.VerticalScrollBarVisibility="Auto" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Bottom">
+              <Button Classes="primary" Content="Анализировать"
+                      Command="{Binding AnalyzeCommand}" IsEnabled="{Binding CanAnalyze}" />
+              <Button Classes="ghost" Content="Пример" Command="{Binding LoadSampleCommand}"
+                      IsEnabled="{Binding CanAnalyze}" />
+              <Button Classes="ghost" Content="Открыть текст…" Click="OpenTextFile_Click"
+                      IsEnabled="{Binding CanAnalyze}" />
+              <Button Classes="ghost" Content="Очистить" Command="{Binding ClearCommand}"
+                      IsEnabled="{Binding CanAnalyze}" />
+            </StackPanel>
+          </Grid>
+          <TextBlock Classes="muted" Text="{Binding Status}" />
+        </StackPanel>
+      </Border>
+
+      <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="8">
+        <Border Classes="stat">
+          <StackPanel>
+            <TextBlock Classes="section" Text="СЛОВ" Margin="0" />
+            <TextBlock Classes="big-value" Text="{Binding TotalWords}" />
+          </StackPanel>
+        </Border>
+        <Border Grid.Column="1" Classes="stat">
+          <StackPanel>
+            <TextBlock Classes="section" Text="УНИКАЛЬНЫХ" Margin="0" />
+            <TextBlock Classes="big-value" Text="{Binding UniqueWords}" />
+          </StackPanel>
+        </Border>
+        <Border Grid.Column="2" Classes="stat">
+          <StackPanel>
+            <TextBlock Classes="section" Text="QUICKSORT" Margin="0" />
+            <TextBlock Classes="big-value" Text="{Binding QuickTimeText}" />
+            <TextBlock Classes="muted" Text="{Binding QuickComparisonsText}" />
+          </StackPanel>
+        </Border>
+        <Border Grid.Column="3" Classes="stat">
+          <StackPanel>
+            <TextBlock Classes="section" Text="RADIX SORT" Margin="0" />
+            <TextBlock Classes="big-value" Text="{Binding RadixTimeText}" />
+            <TextBlock Classes="muted" Text="{Binding RadixOperationsText}" />
+          </StackPanel>
+        </Border>
+      </Grid>
+
+      <Grid ColumnDefinitions="1*,1*" ColumnSpacing="16">
+        <Border Classes="panel" Padding="16">
+          <StackPanel Spacing="8">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Spacing="2">
+                <TextBlock Classes="section" Text="РЕЗУЛЬТАТ СОРТИРОВКИ" />
+                <TextBlock Classes="app-title" Text="Отсортированные слова" />
+              </StackPanel>
+              <Border Grid.Column="1" Classes="chip" Margin="0" VerticalAlignment="Center">
+                <TextBlock Text="{Binding MatchText}" Foreground="{Binding MatchBrush}" FontSize="10.5" />
+              </Border>
+            </Grid>
+            <TextBlock Classes="muted" Text="Одинаковые слова стоят рядом. В строке состояния указано, совпали ли результаты двух алгоритмов." />
+            <TextBox Text="{Binding SortedWordsText}"
+                     IsReadOnly="True"
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     Height="238"
+                     Classes="mono"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto" />
+          </StackPanel>
+        </Border>
+
+        <Border Grid.Column="1" Classes="panel" Padding="16">
+          <StackPanel Spacing="8">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Spacing="2">
+                <TextBlock Classes="section" Text="ПОДСЧЁТ ЧАСТОТ" />
+                <TextBlock Classes="app-title" Text="Сколько раз встречается слово" />
+              </StackPanel>
+              <Border Grid.Column="1" Classes="chip" Margin="0" VerticalAlignment="Center">
+                <TextBlock Text="по алфавиту" Classes="muted" FontSize="10.5" />
+              </Border>
+            </Grid>
+            <ListBox ItemsSource="{Binding Counts}" Height="238" Padding="0">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:WordCountItem">
+                  <Grid ColumnDefinitions="128,*,44" ColumnSpacing="8">
+                    <TextBlock Text="{Binding Word}" Classes="mono" FontSize="11.5"
+                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    <ProgressBar Grid.Column="1" Minimum="0"
+                                 Maximum="{Binding MaxCount}"
+                                 Value="{Binding Count}"
+                                 Height="7" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2" Text="{Binding CountText}"
+                               Classes="value" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </StackPanel>
+        </Border>
+      </Grid>
+
+      <Border Classes="panel" Padding="16">
+        <StackPanel Spacing="10">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <StackPanel Spacing="2">
+              <TextBlock Classes="section" Text="ЭКСПЕРИМЕНТЫ" />
+              <TextBlock Classes="app-title" Text="Время сортировки на текстах разной длины" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <Button Classes="primary" Content="Запустить эксперименты"
+                      Command="{Binding RunBenchmarksCommand}" IsEnabled="{Binding CanRunBenchmarks}" />
+              <Button Classes="ghost" Content="Остановить"
+                      Command="{Binding StopBenchmarksCommand}" IsEnabled="{Binding CanStopBenchmarks}" />
+              <Button Classes="ghost" Content="Сохранить CSV"
+                      Command="{Binding SaveBenchmarksCommand}" IsEnabled="{Binding CanSaveBenchmarks}" />
+            </StackPanel>
+          </Grid>
+
+          <CheckBox IsChecked="{Binding UseInputTextForBenchmarks}"
+                    Content="Использовать текущий текст для экспериментов"
+                    IsEnabled="{Binding CanRunBenchmarks}" />
+          <TextBlock Classes="muted" Text="{Binding BenchmarkSourceLabel}" />
+
+          <ProgressBar Minimum="0" Maximum="100" Value="{Binding BenchmarkProgress}" Height="7" />
+          <TextBlock Classes="muted" Text="{Binding BenchmarkStatus}" />
+
+          <Border Classes="card" Padding="10,7">
+            <Grid ColumnDefinitions="100,125,125,140,140,110,90">
+              <TextBlock Classes="section" Text="СЛОВ" Margin="0" />
+              <TextBlock Grid.Column="1" Classes="section" Text="QUICKSORT" Margin="0" />
+              <TextBlock Grid.Column="2" Classes="section" Text="RADIX" Margin="0" />
+              <TextBlock Grid.Column="3" Classes="section" Text="СРАВНЕНИЙ" Margin="0" />
+              <TextBlock Grid.Column="4" Classes="section" Text="ОПЕРАЦИЙ" Margin="0" />
+              <TextBlock Grid.Column="5" Classes="section" Text="УНИКАЛЬНЫХ" Margin="0" />
+              <TextBlock Grid.Column="6" Classes="section" Text="СОВПАЛИ" Margin="0" />
+            </Grid>
+          </Border>
+
+          <ItemsControl ItemsSource="{Binding BenchmarkRows}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:BenchmarkRowItem">
+                <Border Classes="card" Padding="10,7" Margin="0,0,0,4">
+                  <Grid ColumnDefinitions="100,125,125,140,140,110,90">
+                    <TextBlock Text="{Binding WordCount}" Classes="value" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Text="{Binding QuickTime}" Classes="mono" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2" Text="{Binding RadixTime}" Classes="mono" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="3" Text="{Binding QuickComparisons}" Classes="mono" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="4" Text="{Binding RadixOperations}" Classes="mono" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="5" Text="{Binding UniqueWords}" Classes="mono" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="6" Text="{Binding MatchText}"
+                               Foreground="{Binding MatchBrush}" Classes="value" VerticalAlignment="Center" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+
+      <Border Classes="panel" Padding="16">
+        <StackPanel Spacing="9">
+          <TextBlock Classes="section" Text="КАК ЭТО РАБОТАЕТ" />
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="24">
+            <StackPanel Spacing="5">
+              <TextBlock Classes="app-title" Text="QuickSort" />
+              <TextBlock Classes="info"
+                         Text="Выбирается опорный элемент, массив делится на части «меньше», «равно» и «больше». Трёхпутевая схема удобна для слов: повторы обрабатываются за один проход. В таблице для QuickSort показано число сравнений." />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Spacing="5">
+              <TextBlock Classes="app-title" Text="Radix sort" />
+              <TextBlock Classes="info"
+                         Text="Слова выравниваются по длине и стабильно сортируются по символам справа налево. Это поразрядная сортировка: она не сравнивает слова целиком, а смотрит на один символ за раз. В таблице показано число операций с символами." />
+            </StackPanel>
+          </Grid>
+        </StackPanel>
+      </Border>
+
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

@@ -1,0 +1,289 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:AlgorithmsLab4.App.ViewModels"
+             x:Class="AlgorithmsLab4.App.Views.ExternalSortView"
+             x:DataType="vm:ExternalSortViewModel">
+
+  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="24,20,24,28" Spacing="16">
+
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+        <StackPanel Spacing="5">
+          <TextBlock Classes="section" Text="ЗАДАНИЕ 2 · ВНЕШНЯЯ СОРТИРОВКА" />
+          <TextBlock Classes="page-title" Text="Сортировка таблицы методом слияния" />
+          <TextBlock Classes="muted" MaxWidth="1000"
+                     Text="Таблица читается из CSV-файла и сортируется по выбранной колонке. Пользователь выбирает метод слияния, ключ, направление и фильтр. Промежуточные серии сохраняются в файлы, поэтому программа показывает настоящие шаги внешней сортировки, а результат записывается в отдельный CSV-файл." />
+        </StackPanel>
+
+        <Border Grid.Column="1" Classes="panel" Padding="14" Width="330" VerticalAlignment="Top">
+          <StackPanel Spacing="9">
+            <TextBlock Classes="section" Text="МЕТОДЫ СЛИЯНИЯ" />
+            <WrapPanel>
+              <Border Classes="chip"><TextBlock Text="прямое" Classes="mono" /></Border>
+              <Border Classes="chip"><TextBlock Text="естественное" Classes="mono" /></Border>
+              <Border Classes="chip"><TextBlock Text="многопутевое" Classes="mono" /></Border>
+            </WrapPanel>
+            <TextBlock Classes="muted"
+                       Text="Пример из задания: страны Европы в порядке возрастания численности населения. Можно загрузить и свой CSV-файл с произвольным числом колонок." />
+          </StackPanel>
+        </Border>
+      </Grid>
+
+      <Border Classes="panel" Padding="16">
+        <StackPanel Spacing="12">
+
+          <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+            <StackPanel Spacing="5">
+              <TextBlock Classes="section" Text="ИСХОДНЫЙ ФАЙЛ" Margin="0" />
+              <TextBox Text="{Binding InputPath}" IsReadOnly="True" Classes="mono" />
+            </StackPanel>
+            <Button Grid.Column="1" Classes="ghost" Content="Пример из задания"
+                    Command="{Binding LoadExampleCommand}" IsEnabled="{Binding CanInteract}"
+                    VerticalAlignment="Bottom" />
+            <Button Grid.Column="2" Classes="ghost" Content="Открыть CSV…"
+                    Click="OpenFile_Click" IsEnabled="{Binding CanInteract}"
+                    VerticalAlignment="Bottom" />
+          </Grid>
+
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <StackPanel Spacing="3">
+              <TextBlock Classes="section" Text="РЕЗУЛЬТАТ БУДЕТ СОХРАНЁН В" Margin="0" />
+              <TextBlock Classes="mono" Text="{Binding OutputPath}" TextWrapping="Wrap" />
+            </StackPanel>
+            <Button Grid.Column="1" Classes="ghost" Content="Открыть папку"
+                    Click="OpenOutputFolder_Click" VerticalAlignment="Bottom" />
+          </Grid>
+
+          <TextBlock Classes="muted" Text="{Binding FileInfo}" />
+
+          <Grid ColumnDefinitions="1.2*,1*,1.9*,0.65*,0.65*" ColumnSpacing="12">
+            <StackPanel Spacing="5">
+              <TextBlock Classes="section" Text="КЛЮЧЕВАЯ КОЛОНКА" Margin="0" />
+              <ComboBox ItemsSource="{Binding Columns}"
+                        SelectedItem="{Binding SelectedKeyColumn}"
+                        IsEnabled="{Binding CanInteract}">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:ColumnOption">
+                    <TextBlock Text="{Binding Name}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Spacing="5">
+              <TextBlock Classes="section" Text="НАПРАВЛЕНИЕ" Margin="0" />
+              <ToggleSwitch IsChecked="{Binding Descending}"
+                            OnContent="По убыванию"
+                            OffContent="По возрастанию"
+                            IsEnabled="{Binding CanInteract}" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="2" Spacing="5">
+              <TextBlock Classes="section" Text="МЕТОД" Margin="0" />
+              <ComboBox ItemsSource="{Binding Methods}"
+                        SelectedItem="{Binding SelectedMethod}"
+                        IsEnabled="{Binding CanInteract}">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:ExternalMethodOption">
+                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+            </StackPanel>
+
+            <StackPanel Grid.Column="3" Spacing="5">
+              <TextBlock Classes="section" Text="БЛОК" Margin="0" />
+              <ComboBox ItemsSource="{Binding RunSizes}"
+                        SelectedItem="{Binding SelectedRunSize}"
+                        IsEnabled="{Binding CanInteract}" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="4" Spacing="5">
+              <TextBlock Classes="section" Text="FAN-IN" Margin="0" />
+              <ComboBox ItemsSource="{Binding FanIns}"
+                        SelectedItem="{Binding SelectedFanIn}"
+                        IsEnabled="{Binding IsMultiway}" />
+            </StackPanel>
+          </Grid>
+
+          <Grid ColumnDefinitions="1*,1*,1.2*,Auto" ColumnSpacing="12">
+            <StackPanel Spacing="5">
+              <TextBlock Classes="section" Text="ФИЛЬТР" Margin="0" />
+              <ComboBox ItemsSource="{Binding FilterColumns}"
+                        SelectedItem="{Binding SelectedFilterColumn}"
+                        IsEnabled="{Binding CanInteract}">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:ColumnOption">
+                    <TextBlock Text="{Binding Name}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Spacing="5">
+              <TextBlock Classes="section" Text="ЗНАЧЕНИЕ" Margin="0" />
+              <ComboBox ItemsSource="{Binding FilterValues}"
+                        SelectedItem="{Binding SelectedFilterValue}"
+                        IsEnabled="{Binding HasFilter}" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="2" Spacing="5">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Classes="section" Text="ЗАДЕРЖКА" Margin="0" />
+                <TextBlock Grid.Column="1" Classes="mono" Text="{Binding DelayLabel}"
+                           Foreground="{DynamicResource AppAccentBrush}" />
+              </Grid>
+              <Slider Minimum="0" Maximum="1000" TickFrequency="25"
+                      Value="{Binding DelayMs, Mode=TwoWay}" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+              <Button Classes="primary" Content="Старт"
+                      Command="{Binding StartCommand}" IsEnabled="{Binding CanStart}" />
+              <Button Classes="ghost" Content="{Binding PauseText}"
+                      Command="{Binding TogglePauseCommand}" IsEnabled="{Binding CanPause}" />
+              <Button Classes="danger" Content="Стоп"
+                      Command="{Binding StopSortingCommand}" IsEnabled="{Binding CanStop}" />
+            </StackPanel>
+          </Grid>
+
+          <TextBlock Classes="muted" Text="{Binding Status}" />
+        </StackPanel>
+      </Border>
+
+      <Grid ColumnDefinitions="1.5*,1*" ColumnSpacing="16">
+        <StackPanel Spacing="16">
+          <Border Classes="panel" Padding="16">
+            <StackPanel Spacing="8">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="2">
+                  <TextBlock Classes="section" Text="ИСХОДНАЯ ТАБЛИЦА" />
+                  <TextBlock Classes="app-title" Text="Данные из файла" />
+                </StackPanel>
+                <Border Grid.Column="1" Classes="chip" Margin="0" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding FileInfo}" Classes="muted" FontSize="10.5" />
+                </Border>
+              </Grid>
+              <TextBox Text="{Binding InputPreview}"
+                       IsReadOnly="True"
+                       AcceptsReturn="True"
+                       Classes="mono"
+                       Height="238"
+                       TextWrapping="NoWrap"
+                       ScrollViewer.VerticalScrollBarVisibility="Auto"
+                       ScrollViewer.HorizontalScrollBarVisibility="Auto" />
+            </StackPanel>
+          </Border>
+
+          <Border Classes="panel" Padding="16">
+            <StackPanel Spacing="8">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="2">
+                  <TextBlock Classes="section" Text="РЕЗУЛЬТАТ" />
+                  <TextBlock Classes="app-title" Text="Отсортированная таблица" />
+                </StackPanel>
+                <Border Grid.Column="1" Classes="chip" Margin="0" VerticalAlignment="Center">
+                  <TextBlock Text="записано в CSV" Classes="muted" FontSize="10.5" />
+                </Border>
+              </Grid>
+              <TextBox Text="{Binding ResultPreview}"
+                       IsReadOnly="True"
+                       AcceptsReturn="True"
+                       Classes="mono"
+                       Height="238"
+                       TextWrapping="NoWrap"
+                       ScrollViewer.VerticalScrollBarVisibility="Auto"
+                       ScrollViewer.HorizontalScrollBarVisibility="Auto" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <StackPanel Grid.Column="1" Spacing="16">
+          <Border Classes="panel" Padding="16">
+            <StackPanel Spacing="10">
+              <TextBlock Classes="section" Text="ЧТО ПРОИСХОДИТ" />
+              <Border Classes="card" MinHeight="96">
+                <TextBlock Classes="info" Text="{Binding Explanation}" />
+              </Border>
+              <TextBlock Classes="section" Text="ВЫБРАННЫЙ МЕТОД" Margin="0,4,0,0" />
+              <TextBlock Classes="app-title" Text="{Binding SelectedMethod.Title}" />
+              <TextBlock Classes="info" Text="{Binding MethodDescription}" />
+              <TextBlock Classes="muted" Text="{Binding DirectionHint}" />
+            </StackPanel>
+          </Border>
+
+          <Border Classes="panel" Padding="16">
+            <StackPanel Spacing="9">
+              <TextBlock Classes="section" Text="СТАТИСТИКА" />
+              <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="8">
+                <Border Classes="stat">
+                  <StackPanel>
+                    <TextBlock Classes="section" Text="ЗАПИСЕЙ" Margin="0" />
+                    <TextBlock Classes="big-value" Text="{Binding RecordCount}" />
+                  </StackPanel>
+                </Border>
+                <Border Grid.Column="1" Classes="stat">
+                  <StackPanel>
+                    <TextBlock Classes="section" Text="СРАВНЕНИЙ" Margin="0" />
+                    <TextBlock Classes="big-value" Text="{Binding Comparisons}" />
+                  </StackPanel>
+                </Border>
+                <Border Grid.Column="2" Classes="stat">
+                  <StackPanel>
+                    <TextBlock Classes="section" Text="ПЕРЕМЕЩЕНИЙ" Margin="0" />
+                    <TextBlock Classes="big-value" Text="{Binding Moves}" />
+                  </StackPanel>
+                </Border>
+                <Border Grid.Row="1" Classes="stat">
+                  <StackPanel>
+                    <TextBlock Classes="section" Text="СЕРИЙ" Margin="0" />
+                    <TextBlock Classes="big-value" Text="{Binding RunsCreated}" />
+                  </StackPanel>
+                </Border>
+                <Border Grid.Row="1" Grid.Column="1" Classes="stat">
+                  <StackPanel>
+                    <TextBlock Classes="section" Text="ПРОХОДОВ" Margin="0" />
+                    <TextBlock Classes="big-value" Text="{Binding MergePasses}" />
+                  </StackPanel>
+                </Border>
+                <Border Grid.Row="1" Grid.Column="2" Classes="stat">
+                  <StackPanel>
+                    <TextBlock Classes="section" Text="ОТФИЛЬТРОВАНО" Margin="0" />
+                    <TextBlock Classes="big-value" Text="{Binding FilteredOut}" />
+                  </StackPanel>
+                </Border>
+              </Grid>
+            </StackPanel>
+          </Border>
+
+          <Border Classes="panel" Padding="16">
+            <DockPanel>
+              <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+                <StackPanel Spacing="2">
+                  <TextBlock Classes="section" Text="ЖУРНАЛ" />
+                  <TextBlock Classes="app-title" Text="Сравнения и перемещения" />
+                </StackPanel>
+                <TextBlock Grid.Column="1" Classes="muted" FontSize="10.5"
+                           VerticalAlignment="Bottom" Text="каждый шаг" />
+              </Grid>
+              <ListBox x:Name="ExternalLogList"
+                       ItemsSource="{Binding Log}"
+                       Height="330"
+                       Padding="0">
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:LogEntryViewModel">
+                    <TextBlock Text="{Binding Text}"
+                               Foreground="{Binding Foreground}"
+                               FontFamily="Cascadia Mono,Consolas,Menlo,monospace"
+                               FontSize="11.5"
+                               TextWrapping="Wrap" />
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </DockPanel>
+          </Border>
+        </StackPanel>
+      </Grid>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

@@ -1,0 +1,264 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:AlgorithmsLab4.App.ViewModels"
+             x:Class="AlgorithmsLab4.App.Views.SortingLabView"
+             x:DataType="vm:SortingLabViewModel">
+
+  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="24,20,24,28" Spacing="16">
+
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+        <StackPanel Spacing="5">
+          <TextBlock Classes="section" Text="ЗАДАНИЕ 1 · ВНУТРЕННЯЯ СОРТИРОВКА" />
+          <TextBlock Classes="page-title" Text="Как работают алгоритмы сортировки" />
+          <TextBlock Classes="muted" MaxWidth="980"
+                     Text="Выберите один из четырёх алгоритмов, введите массив чисел и установите задержку. Программа будет показывать каждый шаг: какие элементы сравниваются, какие меняются местами и какие уже встали на своё место. В журнале фиксируются все сравнения и перестановки." />
+        </StackPanel>
+
+        <Border Grid.Column="1" Classes="panel" Padding="14" Width="286" VerticalAlignment="Top">
+          <StackPanel Spacing="9">
+            <TextBlock Classes="section" Text="В ПРОГРАММЕ" />
+            <TextBlock Classes="info" Text="Два алгоритма из квадратичной группы и два — из усовершенствованной." />
+            <WrapPanel>
+              <Border Classes="chip"><TextBlock Text="SelectSort" Classes="mono" /></Border>
+              <Border Classes="chip"><TextBlock Text="BubbleSort" Classes="mono" /></Border>
+              <Border Classes="chip"><TextBlock Text="HeapSort" Classes="mono" /></Border>
+              <Border Classes="chip"><TextBlock Text="QuickSort" Classes="mono" /></Border>
+            </WrapPanel>
+            <TextBlock Classes="muted" Text="Пояснения написаны простым языком, как для ученика 6 класса." />
+          </StackPanel>
+        </Border>
+      </Grid>
+
+      <Border Classes="panel" Padding="16">
+        <StackPanel Spacing="12">
+          <WrapPanel ItemSpacing="14" LineSpacing="12" Orientation="Horizontal">
+
+            <StackPanel Width="286" Spacing="5">
+              <TextBlock Classes="section" Text="АЛГОРИТМ" Margin="0" />
+              <ComboBox ItemsSource="{Binding Algorithms}"
+                        SelectedItem="{Binding SelectedAlgorithm}"
+                        HorizontalAlignment="Stretch">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:AlgorithmOption">
+                    <StackPanel Spacing="1">
+                      <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                      <TextBlock Text="{Binding Group}" Classes="muted" FontSize="10.5" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+            </StackPanel>
+
+            <StackPanel Width="360" Spacing="5">
+              <TextBlock Classes="section" Text="МАССИВ ЧИСЕЛ" Margin="0" />
+              <TextBox Text="{Binding ArrayText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                       PlaceholderText="Например: 42, 8, 17, 3, 91"
+                       AcceptsReturn="False" />
+            </StackPanel>
+
+            <StackPanel Width="206" Spacing="5">
+              <TextBlock Classes="section" Text="СЛУЧАЙНЫЙ МАССИВ" Margin="0" />
+              <Grid ColumnDefinitions="76,*" ColumnSpacing="8">
+                <ComboBox ItemsSource="{Binding RandomSizes}"
+                          SelectedItem="{Binding SelectedRandomSize}" />
+                <Button Grid.Column="1" Classes="ghost" Content="Создать"
+                        Command="{Binding GenerateRandomCommand}"
+                        IsEnabled="{Binding CanStart}" />
+              </Grid>
+            </StackPanel>
+
+            <StackPanel Width="220" Spacing="5">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Classes="section" Text="ЗАДЕРЖКА ШАГА" Margin="0" />
+                <TextBlock Grid.Column="1" Classes="mono" Text="{Binding DelayLabel}"
+                           Foreground="{DynamicResource AppAccentBrush}" />
+              </Grid>
+              <Slider Minimum="0" Maximum="1000" TickFrequency="25"
+                      Value="{Binding DelayMs, Mode=TwoWay}" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+              <Button Classes="primary" Content="Старт"
+                      Command="{Binding StartCommand}" IsEnabled="{Binding CanStart}" />
+              <Button Classes="ghost" Content="{Binding PauseText}"
+                      Command="{Binding TogglePauseCommand}" IsEnabled="{Binding CanPause}" />
+              <Button Classes="danger" Content="Стоп"
+                      Command="{Binding StopSortingCommand}" IsEnabled="{Binding CanStop}" />
+              <Button Classes="ghost" Content="Сброс"
+                      Command="{Binding ResetCommand}" IsEnabled="{Binding CanStart}" />
+            </StackPanel>
+
+          </WrapPanel>
+
+          <TextBlock Classes="muted" Text="{Binding Status}" />
+        </StackPanel>
+      </Border>
+
+      <Grid ColumnDefinitions="1.55*,1*" ColumnSpacing="16">
+
+        <StackPanel Spacing="16">
+          <Border Classes="panel" Padding="16">
+            <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="12">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="2">
+                  <TextBlock Classes="section" Text="ВИЗУАЛИЗАЦИЯ" />
+                  <TextBlock Classes="app-title" Text="Массив и текущий шаг" />
+                </StackPanel>
+                <Border Grid.Column="1" Classes="chip" Margin="0" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding AlgorithmGroup}" Classes="muted" FontSize="11" />
+                </Border>
+              </Grid>
+
+              <Border Grid.Row="1"
+                      Height="324"
+                      Background="{DynamicResource AppChartBackgroundBrush}"
+                      BorderBrush="{DynamicResource AppBorderBrush}"
+                      BorderThickness="1"
+                      CornerRadius="10"
+                      Padding="10,8">
+                <ItemsControl ItemsSource="{Binding Bars}" Height="304">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <UniformGrid Rows="1" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:BarViewModel">
+                      <Grid RowDefinitions="*,Auto" Margin="1,0">
+                        <Border VerticalAlignment="Bottom"
+                                Height="{Binding BarHeight}"
+                                Background="{Binding Fill}"
+                                CornerRadius="3,3,0,0"
+                                MinHeight="3" />
+                        <TextBlock Grid.Row="1"
+                                   Text="{Binding Value}"
+                                   IsVisible="{Binding ShowLabel}"
+                                   FontSize="10"
+                                   Foreground="{DynamicResource AppMutedBrush}"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,3,0,0" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </Border>
+
+              <Grid Grid.Row="2" RowDefinitions="Auto,Auto" RowSpacing="10">
+                <WrapPanel>
+                  <Border Classes="legend-item" Margin="0,0,6,0">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <Border Width="10" Height="10" CornerRadius="2" Background="{DynamicResource AppBarBrush}" />
+                      <TextBlock Text="обычный" Classes="muted" FontSize="10.5" />
+                    </StackPanel>
+                  </Border>
+                  <Border Classes="legend-item" Margin="0,0,6,0">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <Border Width="10" Height="10" CornerRadius="2" Background="{DynamicResource AppCompareBrush}" />
+                      <TextBlock Text="сравнение" Classes="muted" FontSize="10.5" />
+                    </StackPanel>
+                  </Border>
+                  <Border Classes="legend-item" Margin="0,0,6,0">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <Border Width="10" Height="10" CornerRadius="2" Background="{DynamicResource AppSwapBrush}" />
+                      <TextBlock Text="перестановка" Classes="muted" FontSize="10.5" />
+                    </StackPanel>
+                  </Border>
+                  <Border Classes="legend-item" Margin="0,0,6,0">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <Border Width="10" Height="10" CornerRadius="2" Background="{DynamicResource AppPivotBrush}" />
+                      <TextBlock Text="опорный" Classes="muted" FontSize="10.5" />
+                    </StackPanel>
+                  </Border>
+                  <Border Classes="legend-item">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <Border Width="10" Height="10" CornerRadius="2" Background="{DynamicResource AppSortedBrush}" />
+                      <TextBlock Text="готово" Classes="muted" FontSize="10.5" />
+                    </StackPanel>
+                  </Border>
+                </WrapPanel>
+
+                <Grid Grid.Row="1" ColumnDefinitions="*,*,*,*" ColumnSpacing="8">
+                  <Border Classes="stat">
+                    <StackPanel>
+                      <TextBlock Classes="section" Text="СРАВНЕНИЙ" Margin="0" />
+                      <TextBlock Classes="big-value" Text="{Binding Comparisons}" />
+                    </StackPanel>
+                  </Border>
+                  <Border Grid.Column="1" Classes="stat">
+                    <StackPanel>
+                      <TextBlock Classes="section" Text="ПЕРЕСТАНОВОК" Margin="0" />
+                      <TextBlock Classes="big-value" Text="{Binding Swaps}" />
+                    </StackPanel>
+                  </Border>
+                  <Border Grid.Column="2" Classes="stat">
+                    <StackPanel>
+                      <TextBlock Classes="section" Text="ШАГОВ" Margin="0" />
+                      <TextBlock Classes="big-value" Text="{Binding Steps}" />
+                    </StackPanel>
+                  </Border>
+                  <Border Grid.Column="3" Classes="stat">
+                    <StackPanel>
+                      <TextBlock Classes="section" Text="ЭЛЕМЕНТОВ" Margin="0" />
+                      <TextBlock Classes="big-value" Text="{Binding ArrayLength}" />
+                    </StackPanel>
+                  </Border>
+                </Grid>
+              </Grid>
+            </Grid>
+          </Border>
+        </StackPanel>
+
+        <StackPanel Grid.Column="1" Spacing="16">
+          <Border Classes="panel" Padding="16">
+            <StackPanel Spacing="10">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Classes="section" Text="ЧТО ПРОИСХОДИТ" />
+                <Border Grid.Column="1" Classes="chip" Margin="0">
+                  <TextBlock Text="для 6 класса" Classes="muted" FontSize="10.5" />
+                </Border>
+              </Grid>
+
+              <Border Classes="card" MinHeight="105">
+                <TextBlock Classes="info" Text="{Binding Explanation}" />
+              </Border>
+
+              <TextBlock Classes="section" Text="ОБ АЛГОРИТМЕ" Margin="0,4,0,0" />
+              <TextBlock Classes="app-title" Text="{Binding SelectedAlgorithm.Title}" />
+              <TextBlock Classes="info" Text="{Binding AlgorithmDescription}" />
+              <TextBlock Classes="muted" Text="{Binding AlgorithmComplexity}" />
+            </StackPanel>
+          </Border>
+
+          <Border Classes="panel" Padding="16">
+            <DockPanel>
+              <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+                <StackPanel Spacing="2">
+                  <TextBlock Classes="section" Text="ЖУРНАЛ" />
+                  <TextBlock Classes="app-title" Text="Сравнения и перестановки" />
+                </StackPanel>
+                <TextBlock Grid.Column="1" Classes="muted" FontSize="10.5"
+                           VerticalAlignment="Bottom" Text="каждый шаг" />
+              </Grid>
+              <ListBox x:Name="StepLogList"
+                       ItemsSource="{Binding Log}"
+                       Height="420"
+                       Padding="0">
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:LogEntryViewModel">
+                    <TextBlock Text="{Binding Text}"
+                               Foreground="{Binding Foreground}"
+                               FontFamily="Cascadia Mono,Consolas,Menlo,monospace"
+                               FontSize="11.5"
+                               TextWrapping="Wrap" />
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </DockPanel>
+          </Border>
+        </StackPanel>
+
+      </Grid>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

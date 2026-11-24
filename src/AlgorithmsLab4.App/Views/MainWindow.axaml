@@ -1,0 +1,59 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:AlgorithmsLab4.App.ViewModels"
+        xmlns:views="using:AlgorithmsLab4.App.Views"
+        x:Class="AlgorithmsLab4.App.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="Алгоритмы сортировки · Лабораторная работа №4"
+        Width="1280"
+        Height="800"
+        MinWidth="980"
+        MinHeight="620"
+        WindowState="Maximized"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource AppBackgroundBrush}">
+
+  <Grid RowDefinitions="Auto,*" Margin="14">
+    <Border Grid.Row="0" Classes="panel" Padding="18,12" Margin="0,0,0,12">
+      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+        <Border Width="44" Height="44" CornerRadius="12"
+                Background="{DynamicResource AppAccentSoftBrush}"
+                VerticalAlignment="Center">
+          <TextBlock Text="A4" FontSize="16" FontWeight="Bold"
+                     Foreground="{DynamicResource AppAccentBrush}"
+                     HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Border>
+
+        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+          <TextBlock Classes="app-title" Text="Алгоритмы сортировки" />
+          <TextBlock Classes="muted"
+                     Text="Лабораторная работа №4 · внутренняя и внешняя сортировка, QuickSort и radix sort" />
+        </StackPanel>
+
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+          <Border Classes="chip" Margin="0">
+            <TextBlock Classes="mono" Text=".NET 10" Foreground="{DynamicResource AppAccentBrush}" />
+          </Border>
+          <Border Classes="chip" Margin="0">
+            <TextBlock Classes="mono" Text="Avalonia 12" Foreground="{DynamicResource AppAccentBrush}" />
+          </Border>
+          <ToggleSwitch IsChecked="{Binding IsDarkTheme}"
+                        OnContent="Тёмная тема"
+                        OffContent="Светлая тема" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <TabControl Grid.Row="1">
+      <TabItem Header="Задание 1 · Внутренняя сортировка">
+        <views:SortingLabView DataContext="{Binding Sorting}" />
+      </TabItem>
+      <TabItem Header="Задание 2 · Внешняя сортировка">
+        <views:ExternalSortView DataContext="{Binding ExternalSort}" />
+      </TabItem>
+      <TabItem Header="Задание 3 · Быстрая и radix сортировка">
+        <views:WordLabView DataContext="{Binding Words}" />
+      </TabItem>
+    </TabControl>
+  </Grid>
+</Window>

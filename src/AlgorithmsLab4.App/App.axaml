@@ -1,0 +1,60 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="AlgorithmsLab4.App.App"
+             RequestedThemeVariant="Dark">
+
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Dark">
+          <SolidColorBrush x:Key="AppBackgroundBrush" Color="#0B0F15" />
+          <SolidColorBrush x:Key="AppPanelBrush" Color="#141A23" />
+          <SolidColorBrush x:Key="AppPanelAltBrush" Color="#1A2130" />
+          <SolidColorBrush x:Key="AppBorderBrush" Color="#273142" />
+          <SolidColorBrush x:Key="AppTextBrush" Color="#E9EEF7" />
+          <SolidColorBrush x:Key="AppMutedBrush" Color="#8E9AAF" />
+          <SolidColorBrush x:Key="AppAccentBrush" Color="#4F9CF9" />
+          <SolidColorBrush x:Key="AppAccentSoftBrush" Color="#1B2C47" />
+          <SolidColorBrush x:Key="AppGoodBrush" Color="#55D187" />
+          <SolidColorBrush x:Key="AppWarnBrush" Color="#F2B84B" />
+          <SolidColorBrush x:Key="AppBadBrush" Color="#F06A6A" />
+          <SolidColorBrush x:Key="AppBadSoftBrush" Color="#3A1D22" />
+          <SolidColorBrush x:Key="AppChipBrush" Color="#202A3B" />
+          <SolidColorBrush x:Key="AppChartBackgroundBrush" Color="#0E141D" />
+          <SolidColorBrush x:Key="AppCompareBrush" Color="#F2B84B" />
+          <SolidColorBrush x:Key="AppSwapBrush" Color="#F06A6A" />
+          <SolidColorBrush x:Key="AppPivotBrush" Color="#B58CFF" />
+          <SolidColorBrush x:Key="AppSortedBrush" Color="#55D187" />
+          <SolidColorBrush x:Key="AppBarBrush" Color="#4F9CF9" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Light">
+          <SolidColorBrush x:Key="AppBackgroundBrush" Color="#F1F4F9" />
+          <SolidColorBrush x:Key="AppPanelBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="AppPanelAltBrush" Color="#F6F8FC" />
+          <SolidColorBrush x:Key="AppBorderBrush" Color="#D9E0EB" />
+          <SolidColorBrush x:Key="AppTextBrush" Color="#1B202A" />
+          <SolidColorBrush x:Key="AppMutedBrush" Color="#667085" />
+          <SolidColorBrush x:Key="AppAccentBrush" Color="#2563EB" />
+          <SolidColorBrush x:Key="AppAccentSoftBrush" Color="#DCE8FF" />
+          <SolidColorBrush x:Key="AppGoodBrush" Color="#15803D" />
+          <SolidColorBrush x:Key="AppWarnBrush" Color="#B45309" />
+          <SolidColorBrush x:Key="AppBadBrush" Color="#DC2626" />
+          <SolidColorBrush x:Key="AppBadSoftBrush" Color="#FDECEC" />
+          <SolidColorBrush x:Key="AppChipBrush" Color="#E9EEF7" />
+          <SolidColorBrush x:Key="AppChartBackgroundBrush" Color="#EEF2F9" />
+          <SolidColorBrush x:Key="AppCompareBrush" Color="#B45309" />
+          <SolidColorBrush x:Key="AppSwapBrush" Color="#DC2626" />
+          <SolidColorBrush x:Key="AppPivotBrush" Color="#7C3AED" />
+          <SolidColorBrush x:Key="AppSortedBrush" Color="#15803D" />
+          <SolidColorBrush x:Key="AppBarBrush" Color="#2563EB" />
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+
+  <Application.Styles>
+    <Fluent2Theme />
+    <StyleInclude Source="avares://AlgorithmsLab4.App/Styles/AppStyles.axaml" />
+  </Application.Styles>
+
+</Application>
