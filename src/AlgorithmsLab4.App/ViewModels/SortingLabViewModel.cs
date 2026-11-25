@@ -19,12 +19,18 @@ public sealed record AlgorithmOption(
 public sealed partial class SortingLabViewModel : ViewModelBase
 {
     private const int MinArraySize = 3;
-    private const int MaxArraySize = 64;
+    private const int MaxArraySize = 100;
+    private const int MinValue = 1;
+    private const int MaxValue = 999;
 
-    private CancellationTokenSource? _cancellation;
     private readonly HashSet<int> _sortedIndices = [];
-    private int _pivotIndex = -1;
-    private int _stepNumber;
+    private CancellationTokenSource? _playCts;
+    private SortEvent[]? _events;
+    private int[] _initialValues = [];
+    private int[] _comparePrefix = [];
+    private int[] _swapPrefix = [];
+    private string _startExplanation = string.Empty;
+    private bool _finishLogged;
 
     [ObservableProperty]
     private AlgorithmOption _selectedAlgorithm;
@@ -33,22 +39,25 @@ public sealed partial class SortingLabViewModel : ViewModelBase
     private string _arrayText = "42, 8, 17, 3, 91, 25, 60, 14, 73, 31, 5, 88, 47, 12, 66, 29";
 
     [ObservableProperty]
-    private int _selectedRandomSize = 20;
+    private decimal? _randomSize = 20;
+
+    [ObservableProperty]
+    private decimal? _randomMin = 1;
+
+    [ObservableProperty]
+    private decimal? _randomMax = 99;
 
     [ObservableProperty]
     private double _delayMs = 140;
 
     [ObservableProperty]
-    private bool _isRunning;
+    private bool _isPlaying;
 
     [ObservableProperty]
-    private bool _isPaused;
+    private string _status = "Выберите алгоритм и нажмите «Старт» или «Пошагово».";
 
     [ObservableProperty]
-    private string _status = "Выберите алгоритм и нажмите «Старт».";
-
-    [ObservableProperty]
-    private string _explanation = "Нажмите «Старт», и программа покажет каждый шаг сортировки: сравнения, перестановки и готовые элементы.";
+    private string _explanation = "«Старт» — алгоритм сам идёт по шагам с выбранной задержкой. «Пошагово» — шаги переключаете вы кнопками «Вперёд» и «Назад».";
 
     [ObservableProperty]
     private int _comparisons;
@@ -93,13 +102,10 @@ public sealed partial class SortingLabViewModel : ViewModelBase
         ];
 
         _selectedAlgorithm = Algorithms[0];
-        RandomSizes = [8, 12, 16, 20, 25, 30, 40, 50, 60];
         BuildFromText(ArrayText);
     }
 
     public IReadOnlyList<AlgorithmOption> Algorithms { get; }
-
-    public IReadOnlyList<int> RandomSizes { get; }
 
     public ObservableCollection<BarViewModel> Bars { get; } = [];
 
@@ -113,15 +119,31 @@ public sealed partial class SortingLabViewModel : ViewModelBase
 
     public string AlgorithmGroup => SelectedAlgorithm.Group;
 
-    public bool CanStart => !IsRunning;
+    public bool HasSession => _events is not null;
+
+    public bool IsFinished => _events is not null && Steps >= _events.Length;
+
+    /// <summary>Сессия начата, но алгоритм ещё не дошёл до конца.</summary>
+    public bool IsRunning => _events is not null && Steps < _events.Length;
+
+    public bool CanStart => !IsPlaying;
 
     public bool CanStop => IsRunning;
 
     public bool CanPause => IsRunning;
 
-    public string PauseText => IsPaused ? "Продолжить" : "Пауза";
+    public bool CanBack => _events is not null && Steps > 0;
 
-    public void Stop() => _cancellation?.Cancel();
+    public bool CanForward => _events is not null && Steps < _events.Length;
+
+    public string PauseText => IsPlaying ? "Пауза" : "Продолжить";
+
+    public string ProgressText => _events is null ? "Шаг 0" : $"Шаг {Steps} из {_events.Length}";
+
+    public void Stop()
+    {
+        _playCts?.Cancel();
+    }
 
     partial void OnDelayMsChanged(double value) => OnPropertyChanged(nameof(DelayLabel));
 
@@ -132,46 +154,46 @@ public sealed partial class SortingLabViewModel : ViewModelBase
         OnPropertyChanged(nameof(AlgorithmGroup));
     }
 
-    partial void OnIsRunningChanged(bool value)
-    {
-        OnPropertyChanged(nameof(CanStart));
-        OnPropertyChanged(nameof(CanStop));
-        OnPropertyChanged(nameof(CanPause));
-    }
+    partial void OnIsPlayingChanged(bool value) => NotifyState();
 
-    partial void OnIsPausedChanged(bool value) => OnPropertyChanged(nameof(PauseText));
+    partial void OnStepsChanged(int value) => NotifyState();
 
     [RelayCommand]
     private void GenerateRandom()
     {
-        if (IsRunning)
+        EndSession();
+
+        var size = Math.Clamp((int)(RandomSize ?? 20), MinArraySize, MaxArraySize);
+        var min = Math.Clamp((int)(RandomMin ?? MinValue), MinValue, MaxValue);
+        var max = Math.Clamp((int)(RandomMax ?? 99), MinValue, MaxValue);
+        if (min > max)
         {
-            return;
+            (min, max) = (max, min);
         }
 
-        var size = Math.Clamp(SelectedRandomSize, MinArraySize, MaxArraySize);
+        RandomSize = size;
+        RandomMin = min;
+        RandomMax = max;
+
         var random = new Random();
         var values = new int[size];
         for (var index = 0; index < values.Length; index++)
         {
-            values[index] = random.Next(1, 100);
+            values[index] = random.Next(min, max + 1);
         }
 
         ArrayText = string.Join(", ", values);
-        ResetView(values, $"Сгенерирован случайный массив из {size} чисел. Нажмите «Старт».");
+        ResetView(values, $"Сгенерирован массив: {size} чисел от {min} до {max}. Нажмите «Старт» или «Пошагово».");
     }
 
     [RelayCommand]
     private void Reset()
     {
-        if (IsRunning)
-        {
-            return;
-        }
+        EndSession();
 
         if (TryParseArray(ArrayText, out var values, out var error))
         {
-            ResetView(values, "Массив готов. Нажмите «Старт».");
+            ResetView(values, "Массив готов. Нажмите «Старт» или «Пошагово».");
         }
         else
         {
@@ -183,24 +205,84 @@ public sealed partial class SortingLabViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void TogglePause()
+    private async Task TogglePauseAsync()
+    {
+        if (_events is null || Steps >= _events.Length)
+        {
+            return;
+        }
+
+        if (IsPlaying)
+        {
+            PausePlayback();
+        }
+        else
+        {
+            await PlayAsync();
+        }
+    }
+
+    [RelayCommand]
+    private void StopSorting()
     {
         if (!IsRunning)
         {
             return;
         }
 
-        IsPaused = !IsPaused;
-        Status = IsPaused ? "Пауза. Нажмите «Продолжить»." : "Продолжаем сортировку…";
+        EndSession();
+        Status = "Сортировка остановлена пользователем.";
+        Explanation = "Вы остановили сортировку. Можно изменить массив или запустить алгоритм заново.";
+        AppendLog("Остановлено пользователем.", AppPalette.Muted);
     }
 
     [RelayCommand]
-    private void StopSorting() => Stop();
+    private Task StartAsync() => BeginSessionAsync(autoPlay: true);
 
     [RelayCommand]
-    private async Task StartAsync()
+    private Task StartManualAsync() => BeginSessionAsync(autoPlay: false);
+
+    [RelayCommand]
+    private void StepForward()
     {
-        if (IsRunning)
+        if (_events is null || Steps >= _events.Length)
+        {
+            return;
+        }
+
+        PausePlayback();
+        StepForwardCore();
+    }
+
+    [RelayCommand]
+    private void StepBack()
+    {
+        if (_events is null || Steps <= 0)
+        {
+            return;
+        }
+
+        PausePlayback();
+
+        if (_finishLogged)
+        {
+            RemoveLastLog();
+            _finishLogged = false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_events[Steps - 1].LogText))
+        {
+            RemoveLastLog();
+        }
+
+        Steps--;
+        RenderPosition();
+        UpdateStatus();
+    }
+
+    private async Task BeginSessionAsync(bool autoPlay)
+    {
+        if (IsPlaying)
         {
             return;
         }
@@ -213,68 +295,69 @@ public sealed partial class SortingLabViewModel : ViewModelBase
             return;
         }
 
+        EndSession();
         BuildBars(values);
         Log.Clear();
-        _stepNumber = 0;
+
+        var events = SortRunner.Run(SelectedAlgorithm.Value, (int[])values.Clone()).ToArray();
+        _comparePrefix = new int[events.Length + 1];
+        _swapPrefix = new int[events.Length + 1];
+        for (var index = 0; index < events.Length; index++)
+        {
+            _comparePrefix[index + 1] = _comparePrefix[index] + (events[index].Kind == SortEventKind.Compare ? 1 : 0);
+            _swapPrefix[index + 1] = _swapPrefix[index] + (events[index].Kind == SortEventKind.Swap ? 1 : 0);
+        }
+
+        _initialValues = values;
+        _events = events;
+        _finishLogged = false;
         Comparisons = 0;
         Swaps = 0;
         Steps = 0;
-        Status = "Сортировка выполняется…";
-        Explanation = $"Запущен алгоритм «{SelectedAlgorithm.Title}».";
+
+        _startExplanation = autoPlay
+            ? $"Запущен алгоритм «{SelectedAlgorithm.Title}»."
+            : $"Алгоритм «{SelectedAlgorithm.Title}» готов. Нажимайте «Вперёд», чтобы увидеть следующий шаг, и «Назад», чтобы вернуться.";
+        Explanation = _startExplanation;
         AppendLog(
-            $"Старт: {SelectedAlgorithm.Title}; элементов — {values.Length}; задержка — {DelayLabel}.",
+            autoPlay
+                ? $"Старт: {SelectedAlgorithm.Title}; элементов — {values.Length}; задержка — {DelayLabel}."
+                : $"Пошаговый режим: {SelectedAlgorithm.Title}; элементов — {values.Length}; шагов — {events.Length}.",
             AppPalette.Accent);
 
-        using var cancellation = new CancellationTokenSource();
-        _cancellation = cancellation;
-        IsRunning = true;
-        IsPaused = false;
+        NotifyState();
+        UpdateStatus();
 
+        if (autoPlay)
+        {
+            await PlayAsync();
+        }
+    }
+
+    private async Task PlayAsync()
+    {
+        if (_events is null || IsPlaying || Steps >= _events.Length)
+        {
+            return;
+        }
+
+        var cts = new CancellationTokenSource();
+        _playCts = cts;
+        IsPlaying = true;
+        UpdateStatus();
+
+        var eventsSinceYield = 0;
         try
         {
-            var working = (int[])values.Clone();
-            using var enumerator = SortRunner.Run(SelectedAlgorithm.Value, working).GetEnumerator();
-            var eventsSinceYield = 0;
-
-            while (enumerator.MoveNext())
+            while (_events is not null && Steps < _events.Length)
             {
-                cancellation.Token.ThrowIfCancellationRequested();
-
-                while (IsPaused && !cancellation.Token.IsCancellationRequested)
-                {
-                    await Task.Delay(60, cancellation.Token);
-                }
-
-                var sortEvent = enumerator.Current;
-                ApplyEvent(sortEvent);
-                _stepNumber++;
-                Steps++;
-
-                if (sortEvent.Kind == SortEventKind.Compare)
-                {
-                    Comparisons++;
-                }
-                else if (sortEvent.Kind == SortEventKind.Swap)
-                {
-                    Swaps++;
-                }
-
-                if (!string.IsNullOrWhiteSpace(sortEvent.LogText))
-                {
-                    AppendLog(
-                        $"#{_stepNumber:D3}  {sortEvent.LogText}",
-                        sortEvent.Kind == SortEventKind.Swap ? AppPalette.Swap : AppPalette.Warn);
-                }
-
-                if (!string.IsNullOrWhiteSpace(sortEvent.Explanation))
-                {
-                    Explanation = sortEvent.Explanation;
-                }
+                cts.Token.ThrowIfCancellationRequested();
+                StepForwardCore();
 
                 var delay = (int)Math.Round(DelayMs);
                 if (delay > 0)
                 {
-                    await Task.Delay(delay, cancellation.Token);
+                    await Task.Delay(delay, cts.Token);
                 }
                 else if (++eventsSinceYield >= 25)
                 {
@@ -282,25 +365,200 @@ public sealed partial class SortingLabViewModel : ViewModelBase
                     await Task.Yield();
                 }
             }
+        }
+        catch (OperationCanceledException)
+        {
+            // Пауза или остановка — это нормальный выход из цикла.
+        }
+        finally
+        {
+            if (ReferenceEquals(_playCts, cts))
+            {
+                _playCts = null;
+                IsPlaying = false;
+                UpdateStatus();
+            }
 
-            MarkAllSorted();
-            Status = $"Готово! Сравнений: {Comparisons}, перестановок: {Swaps}.";
-            Explanation = $"Массив отсортирован. Алгоритм «{SelectedAlgorithm.Title}» сделал {Comparisons} сравнений и {Swaps} перестановок.";
+            cts.Dispose();
+        }
+    }
+
+    private void PausePlayback()
+    {
+        if (!IsPlaying)
+        {
+            return;
+        }
+
+        _playCts?.Cancel();
+        _playCts = null;
+        IsPlaying = false;
+        UpdateStatus();
+    }
+
+    /// <summary>Завершает сессию: автоход выключается, список шагов сбрасывается.</summary>
+    private void EndSession()
+    {
+        _playCts?.Cancel();
+        _playCts = null;
+        _events = null;
+        _finishLogged = false;
+        IsPlaying = false;
+        NotifyState();
+    }
+
+    private void StepForwardCore()
+    {
+        if (_events is null || Steps >= _events.Length)
+        {
+            return;
+        }
+
+        var sortEvent = _events[Steps];
+        Steps++;
+
+        if (!string.IsNullOrWhiteSpace(sortEvent.LogText))
+        {
+            AppendLog(
+                $"#{Steps:D3}  {sortEvent.LogText}",
+                sortEvent.Kind == SortEventKind.Swap ? AppPalette.Swap : AppPalette.Warn);
+        }
+
+        RenderPosition();
+
+        if (Steps >= _events.Length && !_finishLogged)
+        {
+            _finishLogged = true;
             AppendLog(
                 $"Финиш: массив отсортирован за {Comparisons} сравнений и {Swaps} перестановок.",
                 AppPalette.Good);
         }
-        catch (OperationCanceledException)
+
+        UpdateStatus();
+    }
+
+    /// <summary>
+    /// Рисует состояние после <see cref="Steps"/> шагов. Состояние считается заново
+    /// по списку событий, поэтому шаг назад работает так же, как шаг вперёд.
+    /// </summary>
+    private void RenderPosition()
+    {
+        var events = _events;
+        if (events is null)
         {
-            Status = "Сортировка остановлена пользователем.";
-            Explanation = "Вы остановили сортировку. Можно изменить массив или запустить алгоритм заново.";
-            AppendLog("Остановлено пользователем.", AppPalette.Muted);
+            return;
         }
-        finally
+
+        var position = Math.Clamp(Steps, 0, events.Length);
+        Comparisons = _comparePrefix[position];
+        Swaps = _swapPrefix[position];
+
+        var values = position == 0 ? _initialValues : events[position - 1].Values;
+        var max = values.Length == 0 ? 1 : values.Max();
+        for (var index = 0; index < Bars.Count && index < values.Length; index++)
         {
-            IsRunning = false;
-            IsPaused = false;
-            _cancellation = null;
+            Bars[index].Update(values[index], max);
+            Bars[index].Fill = AppPalette.Bar;
+        }
+
+        if (position == events.Length)
+        {
+            MarkAllSorted();
+            Explanation = $"Массив отсортирован. Алгоритм «{SelectedAlgorithm.Title}» сделал {Comparisons} сравнений и {Swaps} перестановок.";
+            return;
+        }
+
+        _sortedIndices.Clear();
+        var pivotIndex = -1;
+        for (var index = 0; index < position; index++)
+        {
+            var past = events[index];
+            if (past.Kind == SortEventKind.Pivot)
+            {
+                pivotIndex = past.IndexA;
+            }
+            else if (past.Kind == SortEventKind.MarkSorted)
+            {
+                _sortedIndices.Add(past.SortedIndex);
+                pivotIndex = -1;
+            }
+        }
+
+        if (position == 0)
+        {
+            Explanation = _startExplanation;
+            return;
+        }
+
+        var last = events[position - 1];
+        switch (last.Kind)
+        {
+            case SortEventKind.Compare:
+                SetFill(last.IndexA, AppPalette.Compare);
+                SetFill(last.IndexB, AppPalette.Compare);
+                break;
+            case SortEventKind.Swap:
+                SetFill(last.IndexA, AppPalette.Swap);
+                SetFill(last.IndexB, AppPalette.Swap);
+                break;
+        }
+
+        if (pivotIndex >= 0 && pivotIndex < Bars.Count)
+        {
+            Bars[pivotIndex].Fill = AppPalette.Pivot;
+        }
+
+        foreach (var index in _sortedIndices)
+        {
+            SetFill(index, AppPalette.Sorted);
+        }
+
+        if (!string.IsNullOrWhiteSpace(last.Explanation))
+        {
+            Explanation = last.Explanation;
+        }
+    }
+
+    private void UpdateStatus()
+    {
+        if (_events is null)
+        {
+            return;
+        }
+
+        if (Steps >= _events.Length)
+        {
+            Status = $"Готово! Сравнений: {Comparisons}, перестановок: {Swaps}. Кнопка «Назад» вернёт к любому шагу.";
+        }
+        else if (IsPlaying)
+        {
+            Status = "Сортировка выполняется…";
+        }
+        else
+        {
+            Status = $"Шаг {Steps} из {_events.Length}. Листайте «Вперёд» и «Назад» или нажмите «Продолжить».";
+        }
+    }
+
+    private void NotifyState()
+    {
+        OnPropertyChanged(nameof(HasSession));
+        OnPropertyChanged(nameof(IsFinished));
+        OnPropertyChanged(nameof(IsRunning));
+        OnPropertyChanged(nameof(CanStart));
+        OnPropertyChanged(nameof(CanStop));
+        OnPropertyChanged(nameof(CanPause));
+        OnPropertyChanged(nameof(CanBack));
+        OnPropertyChanged(nameof(CanForward));
+        OnPropertyChanged(nameof(PauseText));
+        OnPropertyChanged(nameof(ProgressText));
+    }
+
+    private void RemoveLastLog()
+    {
+        if (Log.Count > 0)
+        {
+            Log.RemoveAt(Log.Count - 1);
         }
     }
 
@@ -308,12 +566,11 @@ public sealed partial class SortingLabViewModel : ViewModelBase
     {
         BuildBars(values);
         Log.Clear();
-        _stepNumber = 0;
         Comparisons = 0;
         Swaps = 0;
         Steps = 0;
         Status = status;
-        Explanation = "Нажмите «Старт», чтобы увидеть сортировку по шагам.";
+        Explanation = "Нажмите «Старт» (автоматически) или «Пошагово» (кнопками «Вперёд»/«Назад»).";
     }
 
     private void BuildFromText(string text)
@@ -332,7 +589,6 @@ public sealed partial class SortingLabViewModel : ViewModelBase
     {
         ArrayLength = values.Length;
         _sortedIndices.Clear();
-        _pivotIndex = -1;
         var max = values.Length == 0 ? 1 : values.Max();
         var showLabels = values.Length <= 32;
 
@@ -340,45 +596,6 @@ public sealed partial class SortingLabViewModel : ViewModelBase
         foreach (var value in values)
         {
             Bars.Add(new BarViewModel(value, max, showLabels));
-        }
-    }
-
-    private void ApplyEvent(SortEvent sortEvent)
-    {
-        var max = sortEvent.Values.Length == 0 ? 1 : sortEvent.Values.Max();
-        for (var index = 0; index < Bars.Count && index < sortEvent.Values.Length; index++)
-        {
-            Bars[index].Update(sortEvent.Values[index], max);
-            Bars[index].Fill = AppPalette.Bar;
-        }
-
-        switch (sortEvent.Kind)
-        {
-            case SortEventKind.Compare:
-                SetFill(sortEvent.IndexA, AppPalette.Compare);
-                SetFill(sortEvent.IndexB, AppPalette.Compare);
-                break;
-            case SortEventKind.Swap:
-                SetFill(sortEvent.IndexA, AppPalette.Swap);
-                SetFill(sortEvent.IndexB, AppPalette.Swap);
-                break;
-            case SortEventKind.Pivot:
-                _pivotIndex = sortEvent.IndexA;
-                break;
-            case SortEventKind.MarkSorted:
-                _sortedIndices.Add(sortEvent.SortedIndex);
-                _pivotIndex = -1;
-                break;
-        }
-
-        if (_pivotIndex >= 0 && _pivotIndex < Bars.Count)
-        {
-            Bars[_pivotIndex].Fill = AppPalette.Pivot;
-        }
-
-        foreach (var index in _sortedIndices)
-        {
-            SetFill(index, AppPalette.Sorted);
         }
     }
 
@@ -425,9 +642,9 @@ public sealed partial class SortingLabViewModel : ViewModelBase
         var result = new int[parts.Length];
         for (var index = 0; index < parts.Length; index++)
         {
-            if (!int.TryParse(parts[index], out var value) || value is < 1 or > 999)
+            if (!int.TryParse(parts[index], out var value) || value is < MinValue or > MaxValue)
             {
-                error = $"«{parts[index]}» — не число от 1 до 999.";
+                error = $"«{parts[index]}» — не число от {MinValue} до {MaxValue}.";
                 return false;
             }
 

@@ -31,12 +31,6 @@
         </StackPanel>
 
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-          <Border Classes="chip" Margin="0">
-            <TextBlock Classes="mono" Text=".NET 10" Foreground="{DynamicResource AppAccentBrush}" />
-          </Border>
-          <Border Classes="chip" Margin="0">
-            <TextBlock Classes="mono" Text="Avalonia 12" Foreground="{DynamicResource AppAccentBrush}" />
-          </Border>
           <ToggleSwitch IsChecked="{Binding IsDarkTheme}"
                         OnContent="Тёмная тема"
                         OffContent="Светлая тема" />

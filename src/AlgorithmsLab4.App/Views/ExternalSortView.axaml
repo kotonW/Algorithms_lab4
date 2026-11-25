@@ -129,7 +129,7 @@
 
             <StackPanel Grid.Column="2" Spacing="5">
               <Grid ColumnDefinitions="*,Auto">
-                <TextBlock Classes="section" Text="ЗАДЕРЖКА" Margin="0" />
+                <TextBlock Classes="section" Text="ЗАДЕРЖКА ШАГА" Margin="0" />
                 <TextBlock Grid.Column="1" Classes="mono" Text="{Binding DelayLabel}"
                            Foreground="{DynamicResource AppAccentBrush}" />
               </Grid>
@@ -139,7 +139,11 @@
 
             <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
               <Button Classes="primary" Content="Старт"
-                      Command="{Binding StartCommand}" IsEnabled="{Binding CanStart}" />
+                      Command="{Binding StartCommand}" IsEnabled="{Binding CanStart}"
+                      ToolTip.Tip="Шаги идут сами с заданной задержкой" />
+              <Button Classes="ghost" Content="Пошагово"
+                      Command="{Binding StartManualCommand}" IsEnabled="{Binding CanStart}"
+                      ToolTip.Tip="Шаги переключаете вы кнопками «Вперёд» и «Назад»" />
               <Button Classes="ghost" Content="{Binding PauseText}"
                       Command="{Binding TogglePauseCommand}" IsEnabled="{Binding CanPause}" />
               <Button Classes="danger" Content="Стоп"
@@ -147,7 +151,17 @@
             </StackPanel>
           </Grid>
 
-          <TextBlock Classes="muted" Text="{Binding Status}" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Classes="ghost" Content="← Назад"
+                    Command="{Binding StepBackCommand}" IsEnabled="{Binding CanBack}" />
+            <Button Classes="ghost" Content="Вперёд →"
+                    Command="{Binding StepForwardCommand}" IsEnabled="{Binding CanForward}" />
+            <TextBlock Classes="mono" Text="{Binding ProgressText}"
+                       Foreground="{DynamicResource AppAccentBrush}"
+                       VerticalAlignment="Center" Margin="8,0,0,0" />
+            <TextBlock Classes="muted" Text="{Binding Status}"
+                       VerticalAlignment="Center" Margin="8,0,0,0" />
+          </StackPanel>
         </StackPanel>
       </Border>
 

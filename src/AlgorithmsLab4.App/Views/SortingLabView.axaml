@@ -57,14 +57,27 @@
                        AcceptsReturn="False" />
             </StackPanel>
 
-            <StackPanel Width="206" Spacing="5">
+            <StackPanel Width="400" Spacing="5">
               <TextBlock Classes="section" Text="СЛУЧАЙНЫЙ МАССИВ" Margin="0" />
-              <Grid ColumnDefinitions="76,*" ColumnSpacing="8">
-                <ComboBox ItemsSource="{Binding RandomSizes}"
-                          SelectedItem="{Binding SelectedRandomSize}" />
-                <Button Grid.Column="1" Classes="ghost" Content="Создать"
+              <Grid ColumnDefinitions="*,*,*,Auto" ColumnSpacing="8">
+                <StackPanel Spacing="2">
+                  <TextBlock Classes="muted" FontSize="10.5" Text="сколько чисел (3–100)" />
+                  <NumericUpDown Value="{Binding RandomSize}" Minimum="3" Maximum="100"
+                                 Increment="1" FormatString="0" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Spacing="2">
+                  <TextBlock Classes="muted" FontSize="10.5" Text="от" />
+                  <NumericUpDown Value="{Binding RandomMin}" Minimum="1" Maximum="999"
+                                 Increment="1" FormatString="0" />
+                </StackPanel>
+                <StackPanel Grid.Column="2" Spacing="2">
+                  <TextBlock Classes="muted" FontSize="10.5" Text="до" />
+                  <NumericUpDown Value="{Binding RandomMax}" Minimum="1" Maximum="999"
+                                 Increment="1" FormatString="0" />
+                </StackPanel>
+                <Button Grid.Column="3" Classes="ghost" Content="Создать"
                         Command="{Binding GenerateRandomCommand}"
-                        IsEnabled="{Binding CanStart}" />
+                        VerticalAlignment="Bottom" />
               </Grid>
             </StackPanel>
 
@@ -80,18 +93,32 @@
 
             <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
               <Button Classes="primary" Content="Старт"
-                      Command="{Binding StartCommand}" IsEnabled="{Binding CanStart}" />
+                      Command="{Binding StartCommand}" IsEnabled="{Binding CanStart}"
+                      ToolTip.Tip="Алгоритм сам идёт по шагам с заданной задержкой" />
+              <Button Classes="ghost" Content="Пошагово"
+                      Command="{Binding StartManualCommand}" IsEnabled="{Binding CanStart}"
+                      ToolTip.Tip="Шаги переключаете вы кнопками «Вперёд» и «Назад»" />
               <Button Classes="ghost" Content="{Binding PauseText}"
                       Command="{Binding TogglePauseCommand}" IsEnabled="{Binding CanPause}" />
               <Button Classes="danger" Content="Стоп"
                       Command="{Binding StopSortingCommand}" IsEnabled="{Binding CanStop}" />
               <Button Classes="ghost" Content="Сброс"
-                      Command="{Binding ResetCommand}" IsEnabled="{Binding CanStart}" />
+                      Command="{Binding ResetCommand}" />
             </StackPanel>
 
           </WrapPanel>
 
-          <TextBlock Classes="muted" Text="{Binding Status}" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Classes="ghost" Content="← Назад"
+                    Command="{Binding StepBackCommand}" IsEnabled="{Binding CanBack}" />
+            <Button Classes="ghost" Content="Вперёд →"
+                    Command="{Binding StepForwardCommand}" IsEnabled="{Binding CanForward}" />
+            <TextBlock Classes="mono" Text="{Binding ProgressText}"
+                       Foreground="{DynamicResource AppAccentBrush}"
+                       VerticalAlignment="Center" Margin="8,0,0,0" />
+            <TextBlock Classes="muted" Text="{Binding Status}"
+                       VerticalAlignment="Center" Margin="8,0,0,0" />
+          </StackPanel>
         </StackPanel>
       </Border>
 

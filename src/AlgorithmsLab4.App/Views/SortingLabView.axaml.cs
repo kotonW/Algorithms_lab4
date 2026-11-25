@@ -1,6 +1,7 @@
 using AlgorithmsLab4.App.ViewModels;
 using Avalonia.Controls;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using System.Collections.Specialized;
 
 namespace AlgorithmsLab4.App.Views;
@@ -31,17 +32,26 @@ public partial class SortingLabView : UserControl
 
     private void OnLogChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        if (e.Action != NotifyCollectionChangedAction.Add || StepLogList.ItemCount == 0)
+        if (e.Action != NotifyCollectionChangedAction.Add)
         {
             return;
         }
 
-        Dispatcher.UIThread.Post(() =>
+        // Крутим только внутренний ScrollViewer журнала (а не всю страницу) и только
+        // если пользователь и так смотрит на конец списка: так журнал можно спокойно читать.
+        var scroll = StepLogList.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
+        if (scroll is null)
         {
-            if (StepLogList.ItemCount > 0)
-            {
-                StepLogList.ScrollIntoView(StepLogList.ItemCount - 1);
-            }
-        });
+            return;
+        }
+
+        var atBottom = scroll.Extent.Height <= scroll.Viewport.Height + 1
+            || scroll.Offset.Y + scroll.Viewport.Height >= scroll.Extent.Height - 4;
+        if (!atBottom)
+        {
+            return;
+        }
+
+        Dispatcher.UIThread.Post(() => scroll.ScrollToEnd(), DispatcherPriority.Background);
     }
 }

@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using System.Diagnostics;
 using System.Collections.Specialized;
 
@@ -100,17 +101,26 @@ public partial class ExternalSortView : UserControl
 
     private void OnLogChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        if (e.Action != NotifyCollectionChangedAction.Add || ExternalLogList.ItemCount == 0)
+        if (e.Action != NotifyCollectionChangedAction.Add)
         {
             return;
         }
 
-        Dispatcher.UIThread.Post(() =>
+        // Крутим только внутренний ScrollViewer журнала (а не всю страницу) и только
+        // если пользователь и так смотрит на конец списка: так журнал можно спокойно читать.
+        var scroll = ExternalLogList.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
+        if (scroll is null)
         {
-            if (ExternalLogList.ItemCount > 0)
-            {
-                ExternalLogList.ScrollIntoView(ExternalLogList.ItemCount - 1);
-            }
-        });
+            return;
+        }
+
+        var atBottom = scroll.Extent.Height <= scroll.Viewport.Height + 1
+            || scroll.Offset.Y + scroll.Viewport.Height >= scroll.Extent.Height - 4;
+        if (!atBottom)
+        {
+            return;
+        }
+
+        Dispatcher.UIThread.Post(() => scroll.ScrollToEnd(), DispatcherPriority.Background);
     }
 }

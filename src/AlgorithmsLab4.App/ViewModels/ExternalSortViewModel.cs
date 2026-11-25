@@ -27,7 +27,15 @@ public sealed partial class ExternalSortViewModel : ViewModelBase
     private string _samplePath;
     private readonly string _tempRoot;
     private CsvTable? _table;
-    private CancellationTokenSource? _cancellation;
+    private CancellationTokenSource? _playCts;
+    private CancellationTokenSource? _prepareCts;
+    private List<ExternalSortStep>? _steps;
+    private ExternalSortResult? _lastResult;
+    private string _resultPreviewText = string.Empty;
+    private string _startExplanation = string.Empty;
+    private bool _finishLogged;
+
+    private const string ResultPlaceholder = "Результат появится здесь после сортировки.";
 
     [ObservableProperty]
     private string _inputPath = string.Empty;
@@ -69,10 +77,13 @@ public sealed partial class ExternalSortViewModel : ViewModelBase
     private bool _descending;
 
     [ObservableProperty]
-    private bool _isRunning;
+    private bool _isPlaying;
 
     [ObservableProperty]
-    private bool _isPaused;
+    private bool _isPreparing;
+
+    [ObservableProperty]
+    private int _stepPosition;
 
     [ObservableProperty]
     private bool _isLoading;
@@ -228,15 +239,27 @@ public sealed partial class ExternalSortViewModel : ViewModelBase
 
     public bool IsMultiway => SelectedMethod.Value == ExternalSortMethod.MultiwayMerge;
 
-    public bool CanStart => !IsRunning && !IsLoading && _table != null;
+    public bool HasSession => _steps is not null;
 
-    public bool CanStop => IsRunning;
+    public bool IsFinished => _steps is not null && StepPosition >= _steps.Count;
+
+    public bool IsRunning => _steps is not null && StepPosition < _steps.Count;
+
+    public bool CanStart => !IsPlaying && !IsLoading && !IsPreparing && _table != null;
+
+    public bool CanStop => IsRunning || IsPreparing;
 
     public bool CanPause => IsRunning;
 
-    public bool CanInteract => !IsRunning && !IsLoading;
+    public bool CanBack => _steps is not null && StepPosition > 0;
 
-    public string PauseText => IsPaused ? "Продолжить" : "Пауза";
+    public bool CanForward => _steps is not null && StepPosition < _steps.Count;
+
+    public bool CanInteract => !IsRunning && !IsLoading && !IsPreparing;
+
+    public string PauseText => IsPlaying ? "Пауза" : "Продолжить";
+
+    public string ProgressText => _steps is null ? "Шаг 0" : $"Шаг {StepPosition} из {_steps.Count}";
 
     public string DirectionLabel => Descending ? "по убыванию" : "по возрастанию";
 
@@ -248,7 +271,11 @@ public sealed partial class ExternalSortViewModel : ViewModelBase
             ? "Файл не загружен"
             : $"{SourceRowCount} записей · {_table.ColumnCount} колонок · разделитель «{_table.Delimiter}»";
 
-    public void Stop() => _cancellation?.Cancel();
+    public void Stop()
+    {
+        _playCts?.Cancel();
+        _prepareCts?.Cancel();
+    }
 
     partial void OnDelayMsChanged(double value) => OnPropertyChanged(nameof(DelayLabel));
 
@@ -272,13 +299,13 @@ public sealed partial class ExternalSortViewModel : ViewModelBase
         RefreshFilterValues();
     }
 
-    partial void OnIsRunningChanged(bool value)
-        => NotifyStateChanged();
+    partial void OnIsPlayingChanged(bool value) => NotifyStateChanged();
 
-    partial void OnIsLoadingChanged(bool value)
-        => NotifyStateChanged();
+    partial void OnIsPreparingChanged(bool value) => NotifyStateChanged();
 
-    partial void OnIsPausedChanged(bool value) => OnPropertyChanged(nameof(PauseText));
+    partial void OnStepPositionChanged(int value) => NotifyStateChanged();
+
+    partial void OnIsLoadingChanged(bool value) => NotifyStateChanged();
 
     [RelayCommand]
     private async Task LoadExampleAsync()
@@ -303,24 +330,90 @@ public sealed partial class ExternalSortViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void TogglePause()
+    private async Task TogglePauseAsync()
     {
+        if (_steps is null || StepPosition >= _steps.Count)
+        {
+            return;
+        }
+
+        if (IsPlaying)
+        {
+            PausePlayback();
+        }
+        else
+        {
+            await PlayAsync();
+        }
+    }
+
+    [RelayCommand]
+    private void StopSorting()
+    {
+        if (IsPreparing)
+        {
+            _prepareCts?.Cancel();
+            return;
+        }
+
         if (!IsRunning)
         {
             return;
         }
 
-        IsPaused = !IsPaused;
-        Status = IsPaused ? "Пауза. Нажмите «Продолжить»." : "Продолжаем сортировку…";
+        EndSession();
+        Status = "Просмотр шагов остановлен.";
+        Explanation = "Итоговый файл уже записан. Можно изменить настройки и запустить заново.";
+        AppendLog("Остановлено пользователем.", AppPalette.Muted);
     }
 
     [RelayCommand]
-    private void StopSorting() => Stop();
+    private Task StartAsync() => BeginSessionAsync(autoPlay: true);
 
     [RelayCommand]
-    private async Task StartAsync()
+    private Task StartManualAsync() => BeginSessionAsync(autoPlay: false);
+
+    [RelayCommand]
+    private void StepForward()
     {
-        if (IsRunning || _table == null)
+        if (_steps is null || StepPosition >= _steps.Count)
+        {
+            return;
+        }
+
+        PausePlayback();
+        StepForwardCore();
+    }
+
+    [RelayCommand]
+    private void StepBack()
+    {
+        if (_steps is null || StepPosition <= 0)
+        {
+            return;
+        }
+
+        PausePlayback();
+
+        if (_finishLogged)
+        {
+            RemoveLastLog();
+            _finishLogged = false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_steps[StepPosition - 1].LogText))
+        {
+            RemoveLastLog();
+        }
+
+        StepPosition--;
+        RenderPosition();
+        UpdateStatus();
+    }
+
+    private async Task BeginSessionAsync(bool autoPlay)
+    {
+        if (IsPlaying || IsPreparing || _table == null)
         {
             return;
         }
@@ -357,54 +450,115 @@ public sealed partial class ExternalSortViewModel : ViewModelBase
             TempDirectoryRoot = _tempRoot,
         };
 
+        EndSession();
         Log.Clear();
         ResetStats();
-        ResultPreview = "Сортировка выполняется…";
+        StepPosition = 0;
+        ResultPreview = ResultPlaceholder;
+        Status = "Выполняем сортировку и записываем шаги…";
         Explanation = $"Метод «{SelectedMethod.Title}». Ключ: {SelectedKeyColumn.Name}, {DirectionLabel}.";
-        Status = "Сортировка выполняется…";
-        AppendLog(
-            $"Старт: {SelectedMethod.Title}; ключ «{SelectedKeyColumn.Name}»; {DirectionLabel}; блок {SelectedRunSize}.",
-            AppPalette.Accent);
 
-        using var cancellation = new CancellationTokenSource();
-        _cancellation = cancellation;
-        IsRunning = true;
-        IsPaused = false;
+        using var prepare = new CancellationTokenSource();
+        _prepareCts = prepare;
+        IsPreparing = true;
 
+        List<ExternalSortStep> steps;
+        string preview;
         try
         {
-            var eventsSinceYield = 0;
-            ExternalSortResult? lastResult = null;
+            var input = InputPath;
+            var output = OutputPath;
+            (steps, preview) = await Task.Run(() => CollectSteps(input, output, options, prepare.Token), prepare.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            Status = "Сортировка отменена.";
+            Explanation = "Шаги не были построены.";
+            AppendLog("Отменено пользователем.", AppPalette.Muted);
+            return;
+        }
+        catch (Exception exception) when (exception is IOException or InvalidDataException or ArgumentException)
+        {
+            Status = "Ошибка внешней сортировки.";
+            Explanation = exception.Message;
+            AppendLog(exception.Message, AppPalette.Bad);
+            return;
+        }
+        finally
+        {
+            IsPreparing = false;
+            _prepareCts = null;
+        }
 
-            foreach (var step in ExternalSorter.Sort(InputPath, OutputPath, options))
+        if (steps.Count == 0)
+        {
+            Status = "Сортировка не вернула ни одного шага.";
+            return;
+        }
+
+        _steps = steps;
+        _lastResult = steps.Select(step => step.Result).LastOrDefault(result => result is not null);
+        _resultPreviewText = preview;
+        _finishLogged = false;
+        _startExplanation = autoPlay
+            ? $"Метод «{SelectedMethod.Title}». Ключ: {SelectedKeyColumn.Name}, {DirectionLabel}."
+            : "Нажимайте «Вперёд», чтобы увидеть следующий шаг, и «Назад», чтобы вернуться.";
+        Explanation = _startExplanation;
+
+        AppendLog(
+            $"Старт: {SelectedMethod.Title}; ключ «{SelectedKeyColumn.Name}»; {DirectionLabel}; блок {SelectedRunSize}; шагов — {steps.Count}.",
+            AppPalette.Accent);
+
+        NotifyStateChanged();
+        UpdateStatus();
+
+        if (autoPlay)
+        {
+            await PlayAsync();
+        }
+    }
+
+    private static (List<ExternalSortStep> Steps, string Preview) CollectSteps(
+        string input,
+        string output,
+        ExternalSortOptions options,
+        CancellationToken token)
+    {
+        var list = new List<ExternalSortStep>();
+        foreach (var step in ExternalSorter.Sort(input, output, options))
+        {
+            token.ThrowIfCancellationRequested();
+            list.Add(step);
+        }
+
+        var preview = CsvTable.Load(output).ToPreviewText(14);
+        return (list, preview);
+    }
+
+    private async Task PlayAsync()
+    {
+        if (_steps is null || IsPlaying || StepPosition >= _steps.Count)
+        {
+            return;
+        }
+
+        var cts = new CancellationTokenSource();
+        _playCts = cts;
+        IsPlaying = true;
+        UpdateStatus();
+
+        var eventsSinceYield = 0;
+        try
+        {
+            while (_steps is not null && StepPosition < _steps.Count)
             {
-                cancellation.Token.ThrowIfCancellationRequested();
-
-                while (IsPaused && !cancellation.Token.IsCancellationRequested)
-                {
-                    await Task.Delay(60, cancellation.Token);
-                }
-
-                Comparisons = step.Comparisons;
-                Moves = step.Moves;
-                RunsCreated = step.RunsCreated;
-                MergePasses = step.MergePasses;
-                Explanation = step.Title;
-
-                if (!string.IsNullOrWhiteSpace(step.LogText))
-                {
-                    AppendLog(step.LogText, BrushFor(step.Kind));
-                }
-
-                if (step.Result is { } result)
-                {
-                    lastResult = result;
-                }
+                cts.Token.ThrowIfCancellationRequested();
+                StepForwardCore();
 
                 var delay = (int)Math.Round(DelayMs);
                 if (delay > 0)
                 {
-                    await Task.Delay(delay, cancellation.Token);
+                    await Task.Delay(delay, cts.Token);
                 }
                 else if (++eventsSinceYield >= 20)
                 {
@@ -412,40 +566,143 @@ public sealed partial class ExternalSortViewModel : ViewModelBase
                     await Task.Yield();
                 }
             }
-
-            if (lastResult is not null)
-            {
-                RecordCount = lastResult.RecordCount;
-                FilteredOut = lastResult.FilteredOut;
-                Comparisons = lastResult.Comparisons;
-                Moves = lastResult.Moves;
-                RunsCreated = lastResult.RunsCreated;
-                MergePasses = lastResult.MergePasses;
-
-                var outputTable = await Task.Run(() => CsvTable.Load(OutputPath), cancellation.Token);
-                ResultPreview = outputTable.ToPreviewText(14);
-                Status = $"Готово! Записей в результате: {RecordCount}.";
-                Explanation = $"Файл сохранён: {OutputPath}";
-                AppendLog($"Готово. Результат: {OutputPath}", AppPalette.Good);
-            }
         }
         catch (OperationCanceledException)
         {
-            Status = "Сортировка остановлена пользователем.";
-            Explanation = "Временные файлы удалены, итоговый файл не изменялся.";
-            AppendLog("Остановлено пользователем.", AppPalette.Muted);
-        }
-        catch (Exception exception) when (exception is IOException or InvalidDataException or ArgumentException)
-        {
-            Status = "Ошибка внешней сортировки.";
-            Explanation = exception.Message;
-            AppendLog(exception.Message, AppPalette.Bad);
+            // Пауза или остановка.
         }
         finally
         {
-            IsRunning = false;
-            IsPaused = false;
-            _cancellation = null;
+            if (ReferenceEquals(_playCts, cts))
+            {
+                _playCts = null;
+                IsPlaying = false;
+                UpdateStatus();
+            }
+
+            cts.Dispose();
+        }
+    }
+
+    private void PausePlayback()
+    {
+        if (!IsPlaying)
+        {
+            return;
+        }
+
+        _playCts?.Cancel();
+        _playCts = null;
+        IsPlaying = false;
+        UpdateStatus();
+    }
+
+    private void EndSession()
+    {
+        _playCts?.Cancel();
+        _playCts = null;
+        _steps = null;
+        _lastResult = null;
+        _finishLogged = false;
+        IsPlaying = false;
+        NotifyStateChanged();
+    }
+
+    private void StepForwardCore()
+    {
+        if (_steps is null || StepPosition >= _steps.Count)
+        {
+            return;
+        }
+
+        var step = _steps[StepPosition];
+        StepPosition++;
+
+        if (!string.IsNullOrWhiteSpace(step.LogText))
+        {
+            AppendLog(step.LogText, BrushFor(step.Kind));
+        }
+
+        RenderPosition();
+
+        if (StepPosition >= _steps.Count && !_finishLogged && _lastResult is not null)
+        {
+            _finishLogged = true;
+            AppendLog($"Готово. Результат: {OutputPath}", AppPalette.Good);
+        }
+
+        UpdateStatus();
+    }
+
+    private void RenderPosition()
+    {
+        var steps = _steps;
+        if (steps is null)
+        {
+            return;
+        }
+
+        var position = Math.Clamp(StepPosition, 0, steps.Count);
+        RecordCount = 0;
+        FilteredOut = 0;
+        ResultPreview = ResultPlaceholder;
+
+        if (position == 0)
+        {
+            Comparisons = 0;
+            Moves = 0;
+            RunsCreated = 0;
+            MergePasses = 0;
+            Explanation = _startExplanation;
+            return;
+        }
+
+        var step = steps[position - 1];
+        Comparisons = step.Comparisons;
+        Moves = step.Moves;
+        RunsCreated = step.RunsCreated;
+        MergePasses = step.MergePasses;
+        Explanation = step.Title;
+
+        if (position == steps.Count && _lastResult is { } result)
+        {
+            RecordCount = result.RecordCount;
+            FilteredOut = result.FilteredOut;
+            Comparisons = result.Comparisons;
+            Moves = result.Moves;
+            RunsCreated = result.RunsCreated;
+            MergePasses = result.MergePasses;
+            ResultPreview = _resultPreviewText;
+            Explanation = $"Файл сохранён: {OutputPath}";
+        }
+    }
+
+    private void UpdateStatus()
+    {
+        if (_steps is null)
+        {
+            return;
+        }
+
+        if (StepPosition >= _steps.Count)
+        {
+            Status = $"Готово! Записей в результате: {RecordCount}. Кнопка «Назад» вернёт к любому шагу.";
+        }
+        else if (IsPlaying)
+        {
+            Status = "Сортировка выполняется…";
+        }
+        else
+        {
+            Status = $"Шаг {StepPosition} из {_steps.Count}. Листайте «Вперёд» и «Назад» или нажмите «Продолжить».";
+        }
+    }
+
+    private void RemoveLastLog()
+    {
+        if (Log.Count > 0)
+        {
+            Log.RemoveAt(Log.Count - 1);
         }
     }
 
@@ -485,6 +742,7 @@ public sealed partial class ExternalSortViewModel : ViewModelBase
 
     private void ApplyTable(string path, CsvTable table)
     {
+        EndSession();
         _table = table;
         InputPath = path;
         SourceRowCount = table.Rows.Count;
@@ -492,8 +750,9 @@ public sealed partial class ExternalSortViewModel : ViewModelBase
             Path.GetDirectoryName(path) ?? ".",
             Path.GetFileNameWithoutExtension(path) + "_sorted.csv");
         InputPreview = table.ToPreviewText(14);
-        ResultPreview = "Результат появится здесь после сортировки.";
+        ResultPreview = ResultPlaceholder;
         ResetStats();
+        StepPosition = 0;
         Log.Clear();
 
         Columns.Clear();
@@ -583,10 +842,17 @@ public sealed partial class ExternalSortViewModel : ViewModelBase
 
     private void NotifyStateChanged()
     {
+        OnPropertyChanged(nameof(HasSession));
+        OnPropertyChanged(nameof(IsFinished));
+        OnPropertyChanged(nameof(IsRunning));
         OnPropertyChanged(nameof(CanStart));
         OnPropertyChanged(nameof(CanStop));
         OnPropertyChanged(nameof(CanPause));
+        OnPropertyChanged(nameof(CanBack));
+        OnPropertyChanged(nameof(CanForward));
         OnPropertyChanged(nameof(CanInteract));
+        OnPropertyChanged(nameof(PauseText));
+        OnPropertyChanged(nameof(ProgressText));
     }
 
     private void AppendLog(string text, Avalonia.Media.IBrush brush)
